@@ -3,6 +3,7 @@
 import logging
 import os
 import uuid
+import tempfile
 from collections import Counter
 
 import pandas as pd
@@ -19,6 +20,17 @@ from rest_framework.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
+# DICOM support
+try:
+    import pydicom
+    import numpy as np
+    from PIL import Image
+    from django.core.files.base import ContentFile
+    DICOM_SUPPORT = True
+except ImportError:
+    DICOM_SUPPORT = False
+    logger.warning("DICOM support dependencies (pydicom, numpy, Pillow) not found. DICOM files will not be processed.")
+
 
 def upload_name_generator(instance, filename):
     project = str(instance.project_id)
@@ -32,6 +44,16 @@ class FileUpload(models.Model):
     user = models.ForeignKey('users.User', related_name='file_uploads', on_delete=models.CASCADE)
     project = models.ForeignKey('projects.Project', related_name='file_uploads', on_delete=models.CASCADE)
     file = models.FileField(upload_to=upload_name_generator)
+
+    def save(self, *args, **kwargs):
+        # Convert DICOM to PNG before saving if it's a DICOM file
+        if not self.pk:  # Only for new uploads
+            super().save(*args, **kwargs)  # Save first to get file path
+            self.convert_dicom_to_png()  # Convert if it's a DICOM file
+            if hasattr(self, '_format') and self._format == '.png':  # If conversion happened
+                # Update the instance in database
+                kwargs['update_fields'] = ['file']
+        super().save(*args, **kwargs)
 
     def has_permission(self, user):
         user.project = self.project  # link for activity log
@@ -54,6 +76,10 @@ class FileUpload(models.Model):
 
     @property
     def format(self):
+        # Return cached format if already determined
+        if hasattr(self, '_format'):
+            return self._format
+            
         file_format = None
         try:
             file_format = os.path.splitext(self.filepath)[-1]
@@ -61,6 +87,8 @@ class FileUpload(models.Model):
             pass
         finally:
             logger.debug('Get file format ' + str(file_format))
+            # Cache the format
+            self._format = file_format
         return file_format
 
     @property
@@ -107,6 +135,57 @@ class FileUpload(models.Model):
                 raise ValidationError('Task item should be dict')
             tasks_formatted.append(task)
         return tasks_formatted
+
+    def convert_dicom_to_png(self):
+        """
+        Convert DICOM file to PNG format and update the file field
+        """
+        if not DICOM_SUPPORT:
+            logger.warning("DICOM support dependencies not found. Cannot convert DICOM to PNG.")
+            return
+            
+        if self.format and self.format.lower() == '.dcm':
+            # Generate PNG filename
+            png_filename = os.path.splitext(self.file_name)[0] + '.png'
+            
+            # Create temporary path for converted PNG
+            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_png:
+                tmp_png_path = tmp_png.name
+            
+            try:
+                # Read DICOM file
+                ds = pydicom.dcmread(self.file.path)
+                
+                # Get pixel array
+                pixel_array = ds.pixel_array
+                
+                # Normalize pixel values to 0-255 range
+                normalized_array = (pixel_array - pixel_array.min()) / (pixel_array.max() - pixel_array.min())
+                scaled_array = (normalized_array * 255).astype(np.uint8)
+                
+                # Create image object and save as PNG
+                image = Image.fromarray(scaled_array)
+                image.save(tmp_png_path, 'PNG')
+                
+                # Save converted PNG file to Django's FileField
+                with open(tmp_png_path, 'rb') as f:
+                    png_content = ContentFile(f.read())
+                    self.file.save(png_filename, png_content, save=False)
+                
+                # Update format
+                self._format = '.png'
+                logger.debug(f'Converted DICOM {self.file_name} to PNG {png_filename}')
+                
+            except Exception as e:
+                logger.error(f'Failed to convert DICOM to PNG: {e}')
+                # Clean up temporary file if conversion failed
+                if os.path.exists(tmp_png_path):
+                    os.unlink(tmp_png_path)
+                raise
+            finally:
+                # Clean up temporary file
+                if os.path.exists(tmp_png_path):
+                    os.unlink(tmp_png_path)
 
     def read_task_from_hypertext_body(self):
         logger.debug('Read 1 task from hypertext file {}'.format(self.filepath))

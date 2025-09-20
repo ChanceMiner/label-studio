@@ -506,6 +506,7 @@ SUPPORTED_EXTENSIONS = set(
         '.webm',
         '.webp',
         '.pdf',
+        '.dcm',
     ]
 )
 

@@ -30,14 +30,14 @@ function flatten(nested) {
 
 // Keep in sync with core.settings.SUPPORTED_EXTENSIONS on the BE.
 const supportedExtensions = {
-  text: ["txt"],
-  audio: ["wav", "mp3", "flac", "m4a", "ogg"],
-  video: ["mp4", "webm"],
-  image: ["bmp", "gif", "jpg", "jpeg", "png", "svg", "webp"],
+  audio: ["mp3", "m4a", "wav", "flac", "ogg"],
+  image: ["bmp", "gif", "jpg", "jpeg", "png", "svg", "webp", "dcm"],
   html: ["html", "htm", "xml"],
   pdf: ["pdf"],
   structuredData: ["csv", "tsv", "json"],
-};
+  text: ["txt"],
+  video: ["mp4", "webm"],
+};;
 const allSupportedExtensions = flatten(Object.values(supportedExtensions));
 
 function getFileExtension(fileName) {
