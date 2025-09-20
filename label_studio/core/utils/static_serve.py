@@ -45,6 +45,8 @@ def serve(request, path, document_root=None, show_indexes=False, manifest_asset_
         manifest_json = {"main.js": "/react-app/main.123456.js"}
         fullpath = Path(safe_join(document_root, "main.123456.js"))
     """
+    from django.core.exceptions import SuspiciousFileOperation
+    
     path = posixpath.normpath(path).lstrip('/')
     fullpath = Path(safe_join(document_root, path))
     if fullpath.is_dir():
@@ -56,7 +58,14 @@ def serve(request, path, document_root=None, show_indexes=False, manifest_asset_
         )
         if possible_asset.startswith(manifest_asset_prefix):
             possible_asset = possible_asset[len(manifest_asset_prefix) :]
-        fullpath = Path(safe_join(document_root, possible_asset))
+        
+        # 防止路径遍历攻击，确保路径在 document_root 内
+        try:
+            fullpath = Path(safe_join(document_root, possible_asset))
+        except SuspiciousFileOperation:
+            # 如果路径不安全，尝试使用原始路径
+            fullpath = Path(safe_join(document_root, path))
+            
     if not fullpath.exists():
         raise Http404(_('“%(path)s” does not exist') % {'path': fullpath})
     # Respect the If-Modified-Since header.

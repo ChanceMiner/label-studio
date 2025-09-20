@@ -76,6 +76,8 @@ dependencies = [
     ## HumanSignal repo dependencies :start
     "label-studio-sdk @ https://github.com/HumanSignal/label-studio-sdk/archive/228d91101d156d61c2d6334cc6cc0bfe1a79c254.zip",
     ## HumanSignal repo dependencies :end
+    "pydicom (>=3.0.1,<4.0.0)",
+    "pillow (>=11.3.0,<12.0.0)"
 ]
 
 [project.urls]
