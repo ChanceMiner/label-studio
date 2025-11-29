@@ -18,8 +18,8 @@
     line-height: 40px;
   }
 
-  @at-root #{selector-append(&,_leaf,&,_hidden)},
-  #{selector-append(&,_notLeaf,&,_hidden)} {
+  .choice_leaf.choice_hidden,
+  .choice_notLeaf.choice_hidden {
     display: none;
   }
 

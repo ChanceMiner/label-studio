@@ -6,17 +6,16 @@ $gap: 30px;
 .grid {
   flex-grow: 1;
   display: grid;
+  grid-auto-flow: column;
+  grid-column-gap: $gap;
   grid-auto-columns: calc(50% - 15px);
+  margin: 0 30px;
+  overflow: auto;
+  position: relative;
 
   @include respond("tablet") {
     grid-auto-columns: 100%;
   }
-
-  grid-auto-flow: column;
-  grid-column-gap: $gap;
-  margin: 0 30px;
-  overflow: auto;
-  position: relative;
 }
 
 .grid > div > h4 {
